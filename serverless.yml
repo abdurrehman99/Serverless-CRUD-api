@@ -30,6 +30,14 @@ functions:
       - http:
           path: /users/getAll
           method: get
+
+  getOne:
+    handler: handler.getOne
+    events:
+      - http:
+          path: /users/getOne/{id}
+          method: get
+
   update:
     handler: handler.update
     events:
@@ -68,7 +76,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.DYNAMODB_TABLE}
+        TableName: Users
 
 
 plugins:

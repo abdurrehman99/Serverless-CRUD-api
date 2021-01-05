@@ -18,31 +18,24 @@ module.exports.create = async (event, context, callback) => {
       TableName: process.env.DYNAMODB_TABLE,
       Item: {
         id: uuid.v1(),
-        name,
+        username : name,
         email,
       },
     };
-    dynamoDB.put(params, (e) => {
-      if (e) {
-        handleError(e, "Fail to create new User", callback);
-      }
-      const response = {
-        statusCode: 200,
-        body: JSON.stringify(params.Item),
-      };
-      console.log("response", response);
-      return {
-        statusCode: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Credentials": true,
-        },
-        body: JSON.stringify(response, null, 2),
-      };
-      // callback(null,response)
-    });
+    const result = await dynamoDB.put(params).promise();
+    let res = {
+      message: "User Created",
+    };
+    return {
+      statusCode: 200,
+      body: JSON.stringify(res, null, 2),
+    };
   } catch (error) {
-    console.log("error", error);
+    console.log(error);
+    return {
+      statusCode: 400,
+      body: JSON.stringify(error.message, null, 2),
+    };
   }
 };
 
@@ -50,78 +43,106 @@ module.exports.getAll = async (event, context, callback) => {
   let params = {
     TableName: process.env.DYNAMODB_TABLE,
   };
-  // try {
-  //   const result = await dynamoDB.scan(params);
-  //   callback(null,{
-  //     statusCode: 201,
-  //     body: JSON.stringify(result.Items)
-  //   });
-  // } catch (error) {
-  //   console.error(error);
-  //   handleError(e, " Fail to fetch users", callback);
-  // }
-  dynamoDB.scan(params, (error, result) => {
-    if (error) {
-      console.log(error);
-      handleError(e, " Fail to fetch users", callback);
-    }
-    const response = {
+  try {
+    const result = await dynamoDB.scan(params).promise();
+    console.log(result);
+
+    callback(null, {
       statusCode: 200,
       body: JSON.stringify(result.Items),
-    };
-    callback(null, response);
-  });
+    });
+  } catch (error) {
+    console.error(error);
+    handleError(error, " Fail to fetch users", callback);
+  }
+};
+
+module.exports.getOne = async (event, context, callback) => {
+  const {id} = event.pathParameters;
+  let params = {
+    TableName: process.env.DYNAMODB_TABLE,
+    Key: {
+      id
+    },
+  };
+  try {
+    const result = await dynamoDB.get(params).promise();
+    if(result.Item){
+      callback(null, {
+        statusCode: 200,
+        body: JSON.stringify(result.Item),
+      });
+    }
+    callback(null, {
+      statusCode: 200,
+      body: JSON.stringify({message : 'No user found of id '+id}),
+    });
+  } catch (error) {
+    console.error(error);
+    handleError(error, " Fail to fetch users", callback);
+  }
 };
 
 module.exports.update = async (event, context, callback) => {
-  const requestBody = JSON.parse(event.body);
-    const id = event.pathParameters.id;
-    const params = {
-        TableName: process.env.DYNAMODB_TABLE, // table name
-        Key: {
-            id
-        },
-        ExpressionAttributeValues: {
-            ':name': requestBody.name,
-            ':email': requestBody.email,
-        },
-        UpdateExpression: "SET name = :name, email = :email,",
-        ReturnValues: 'ALL_NEW' // get all new values from the database
+  const body = JSON.parse(event.body);
+  const {id} = event.pathParameters;
+  console.log('body',body)
+  const params = {
+    TableName: process.env.DYNAMODB_TABLE, // table name
+    Key: {
+      id
+    },
+    ExpressionAttributeValues: {
+      ':username': body.name,
+      ':email': body.email,
+    },
+    UpdateExpression: "SET username = :username, email = :email",
+    ReturnValues: "UPDATED_NEW" // get all new values from the database
+  };
+  try {
+    const result = await dynamoDB.update(params).promise();
+    const response = {
+      statusCode: 200,
+      body: JSON.stringify(result),
     };
-    dynamoDB.update(params, (error, result) => {
-        if (error) {
-            handleError(error, 'Failed to Update the User', callback);
-        }
-        const response = {
-            statusCode: 200,
-            body: JSON.stringify(result)
-        };
-        callback(null, response);
-    })
+    callback(null, response);
+  } catch (error) {
+    console.log('error',error)
+    handleError(error, "Failed to Update the User", callback);
+  }
 };
 
 module.exports.delete = async (event, context, callback) => {
-  const id = event.pathParameters.id;
+  const {id} = event.pathParameters;
   const params = {
-      TableName: process.env.DYNAMODB_TABLE, // table name
-      Key: {
-          id
-      }
+    TableName: process.env.DYNAMODB_TABLE, // table name
+    Key: {
+      id
+    },
   };
-  dynamoDB.delete(params, (error) => {
-      if (error) {
-          handleError(error, 'Failed to Delete the User', callback)
-      }
-      const response = {
-          statusCode: 200,
-          body: JSON.stringify(`User ${id} removed from DB`)
-      };
-      callback(null, response);
-  });
+  try {
+    const result = await dynamoDB.delete(params).promise();
+    console.log('result',result)
+    if(result === {}){
+      callback(null, {
+        statusCode: 200,
+        body: JSON.stringify({
+          message: `User ${id} removed from DB`,
+        }),
+      });
+    }
+    else{
+      callback(null, {
+        statusCode: 400,
+        body: JSON.stringify({
+          message: `User ${id} not found !`,
+        }),
+      });
+    }
+  } catch (error) {
+    handleError(error, "Failed to Delete the User", callback);
+  }
 };
-
-
-
 
 // Handler that handles the error, occured during insert, read, update, delete
 const handleError = (error, errorMsg, callback) => {
