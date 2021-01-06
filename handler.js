@@ -18,11 +18,12 @@ module.exports.create = async (event, context, callback) => {
       TableName: process.env.DYNAMODB_TABLE,
       Item: {
         id: uuid.v1(),
-        username : name,
+        username: name,
         email,
       },
     };
     const result = await dynamoDB.put(params).promise();
+    console.log("result", result);
     let res = {
       message: "User Created",
     };
@@ -49,7 +50,7 @@ module.exports.getAll = async (event, context, callback) => {
 
     callback(null, {
       statusCode: 200,
-      body: JSON.stringify(result.Items),
+      body: JSON.stringify(result.Items, null, 2),
     });
   } catch (error) {
     console.error(error);
@@ -58,25 +59,28 @@ module.exports.getAll = async (event, context, callback) => {
 };
 
 module.exports.getOne = async (event, context, callback) => {
-  const {id} = event.pathParameters;
+  const { id } = event.pathParameters;
+  console.log(event.pathParameters);
   let params = {
     TableName: process.env.DYNAMODB_TABLE,
     Key: {
-      id
+      id,
     },
   };
   try {
     const result = await dynamoDB.get(params).promise();
-    if(result.Item){
+    console.log("result=>", result);
+    if (result.Item) {
       callback(null, {
         statusCode: 200,
         body: JSON.stringify(result.Item),
       });
+    } else {
+      callback(null, {
+        statusCode: 200,
+        body: JSON.stringify({ message: "No user found of id " + id }),
+      });
     }
-    callback(null, {
-      statusCode: 200,
-      body: JSON.stringify({message : 'No user found of id '+id}),
-    });
   } catch (error) {
     console.error(error);
     handleError(error, " Fail to fetch users", callback);
@@ -85,53 +89,65 @@ module.exports.getOne = async (event, context, callback) => {
 
 module.exports.update = async (event, context, callback) => {
   const body = JSON.parse(event.body);
-  const {id} = event.pathParameters;
-  console.log('body',body)
-  const params = {
+  const { id } = event.pathParameters;
+  let params = {
     TableName: process.env.DYNAMODB_TABLE, // table name
-    Key: {
-      id
-    },
-    ExpressionAttributeValues: {
-      ':username': body.name,
-      ':email': body.email,
-    },
-    UpdateExpression: "SET username = :username, email = :email",
-    ReturnValues: "UPDATED_NEW" // get all new values from the database
   };
+  params["Key"] = {
+    id,
+  };
+ 
   try {
-    const result = await dynamoDB.update(params).promise();
-    const response = {
-      statusCode: 200,
-      body: JSON.stringify(result.Attributes),
-    };
-    callback(null, response);
+    const found = await dynamoDB.get(params).promise();
+    console.log("found=>", found);
+    if (found.Item){
+      params["ExpressionAttributeValues"] = {
+        ":username": body.name,
+        ":email": body.email,
+      };
+      params["UpdateExpression"] = "SET username = :username, email = :email";
+      params["ReturnValues"] = "ALL_NEW";
+      const result = await dynamoDB.update(params).promise();
+      console.log("result==>", result);
+      const response = {
+        statusCode: 200,
+        body: JSON.stringify(result.Attributes),
+      };
+      callback(null, response);
+    }
+    else{
+      callback(null, {
+        statusCode: 400,
+        body: JSON.stringify({
+          message :"No user found with id : "+id
+        }),
+      });
+    }
   } catch (error) {
-    console.log('error',error)
+    console.log("error", error);
     handleError(error, "Failed to Update the User", callback);
   }
 };
 
 module.exports.delete = async (event, context, callback) => {
-  const {id} = event.pathParameters;
+  const { id } = event.pathParameters;
   const params = {
     TableName: process.env.DYNAMODB_TABLE, // table name
     Key: {
-      id
+      id,
     },
   };
   try {
     const result = await dynamoDB.delete(params).promise();
-    console.log('result',result)
-    if(result === {}){
+    console.log("result", result);
+    if (result === {}) {
       callback(null, {
         statusCode: 200,
         body: JSON.stringify({
           message: `User ${id} removed from DB`,
         }),
       });
-    }
-    else{
+    } else {
       callback(null, {
         statusCode: 400,
         body: JSON.stringify({
