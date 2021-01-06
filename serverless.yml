@@ -22,34 +22,34 @@ functions:
     handler: handler.create
     events:
       - http:
-          path: /users/create
+          path: /users
           method: post
   getAll:
     handler: handler.getAll
     events:
       - http:
-          path: /users/getAll
+          path: /users
           method: get
 
   getOne:
     handler: handler.getOne
     events:
       - http:
-          path: /users/getOne/{id}
+          path: /users/{id}
           method: get
 
   update:
     handler: handler.update
     events:
       - http:
-          path: /users/update/{id}
+          path: /users/{id}
           method: put
           cors: true
   delete:
     handler: handler.delete
     events:
       - http:
-          path: /users/delete/{id}
+          path: /users/{id}
           method: delete
           cors: true
 custom:

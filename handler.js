@@ -103,7 +103,7 @@ module.exports.update = async (event, context, callback) => {
     const result = await dynamoDB.update(params).promise();
     const response = {
       statusCode: 200,
-      body: JSON.stringify(result),
+      body: JSON.stringify(result.Attributes),
     };
     callback(null, response);
   } catch (error) {
